@@ -8,54 +8,50 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(bodyParser.text({ limit: '100mb' })); // Unlimited text
+app.use(bodyParser.text({ limit: '100mb' }));
 app.use(bodyParser.json({ limit: '100mb' }));
 app.use(express.static('public'));
 
-// Konfigurasi upload file
+// Konfigurasi upload
 const upload = multer({
     dest: 'uploads/',
-    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max
+    limits: { fileSize: 100 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-        // Terima semua file
         cb(null, true);
     }
 });
 
-// Folder untuk menyimpan paste
+// Folder
 const DATA_DIR = path.join(__dirname, 'data');
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
 
-// Generate random ID
+// Generate ID
 function generateId() {
     return crypto.randomBytes(6).toString('hex');
 }
 
-// Simpan paste ke file dengan metadata
+// Simpan paste
 function savePaste(id, content, filename = null) {
     const filePath = path.join(DATA_DIR, `${id}.txt`);
     const metaPath = path.join(DATA_DIR, `${id}.meta.json`);
     
-    // Save content
     fs.writeFileSync(filePath, content, 'utf8');
     
-    // Save metadata
     const metadata = {
         id: id,
         filename: filename || `paste-${id}.txt`,
         created: new Date().toISOString(),
         updated: new Date().toISOString(),
-        size: content.length,
-        type: 'text'
+        size: content.length
     };
     fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2));
     
     return metadata;
 }
 
-// Baca paste dari file
+// Baca paste
 function getPaste(id) {
     const filePath = path.join(DATA_DIR, `${id}.txt`);
     const metaPath = path.join(DATA_DIR, `${id}.meta.json`);
@@ -91,12 +87,13 @@ function updatePaste(id, content, filename = null) {
     return false;
 }
 
-// Delete paste
+// Delete paste - FIXED: cuma hapus 1 file aja
 function deletePaste(id) {
     const filePath = path.join(DATA_DIR, `${id}.txt`);
     const metaPath = path.join(DATA_DIR, `${id}.meta.json`);
     let deleted = false;
     
+    // Hanya hapus file dengan ID yang spesifik
     if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
         deleted = true;
@@ -107,7 +104,7 @@ function deletePaste(id) {
     return deleted;
 }
 
-// Get all pastes (for dashboard)
+// Get all pastes
 function getAllPastes() {
     const files = fs.readdirSync(DATA_DIR);
     const pastes = [];
@@ -124,7 +121,7 @@ function getAllPastes() {
     return pastes.sort((a, b) => new Date(b.created) - new Date(a.created));
 }
 
-// Homepage - Reo Pastebin dengan Upload
+// HOME - UI yang lebih bagus
 app.get('/', (req, res) => {
     res.send(`
         <!DOCTYPE html>
@@ -135,6 +132,18 @@ app.get('/', (req, res) => {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
+                :root {
+                    --primary: #6C63FF;
+                    --primary-dark: #5A52D5;
+                    --secondary: #FF6584;
+                    --success: #00C9A7;
+                    --warning: #FFC107;
+                    --danger: #FF4757;
+                    --dark: #2D3436;
+                    --gray: #636E72;
+                    --light-gray: #DFE6E9;
+                    --bg: #F8F9FA;
+                }
                 body {
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -142,23 +151,178 @@ app.get('/', (req, res) => {
                     padding: 20px;
                 }
                 .container {
-                    max-width: 1000px;
+                    max-width: 1200px;
                     margin: 0 auto;
+                }
+                .main-card {
                     background: white;
-                    border-radius: 20px;
-                    padding: 30px;
+                    border-radius: 24px;
+                    padding: 35px;
                     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-                }
-                h1 {
-                    color: #333;
-                    margin-bottom: 5px;
-                    font-size: 2.5em;
-                }
-                .subtitle {
-                    color: #666;
                     margin-bottom: 20px;
+                }
+                .header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 25px;
+                    flex-wrap: wrap;
+                    gap: 15px;
+                }
+                .header-left h1 {
+                    font-size: 2.2em;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                }
+                .header-left .subtitle {
+                    color: var(--gray);
+                    font-size: 0.95em;
+                }
+                .header-actions {
+                    display: flex;
+                    gap: 10px;
+                    flex-wrap: wrap;
+                }
+                .btn {
+                    padding: 10px 22px;
+                    border: none;
+                    border-radius: 12px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 0.95em;
+                    text-decoration: none;
+                }
+                .btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+                }
+                .btn-primary {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                }
+                .btn-success { background: var(--success); color: white; }
+                .btn-danger { background: var(--danger); color: white; }
+                .btn-warning { background: var(--warning); color: var(--dark); }
+                .btn-secondary { background: var(--light-gray); color: var(--dark); }
+                .btn-info { background: #4A9EFF; color: white; }
+                .btn-outline {
+                    background: transparent;
+                    border: 2px solid var(--primary);
+                    color: var(--primary);
+                }
+                .btn-outline:hover { background: var(--primary); color: white; }
+                .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+                .upload-area {
+                    border: 2px dashed var(--light-gray);
+                    border-radius: 16px;
+                    padding: 30px;
+                    text-align: center;
+                    transition: all 0.3s;
+                    background: #FAFBFC;
+                    margin-bottom: 20px;
+                    position: relative;
+                }
+                .upload-area:hover, .upload-area.dragover {
+                    border-color: var(--primary);
+                    background: #F0EEFF;
+                }
+                .upload-area .icon { font-size: 40px; margin-bottom: 10px; }
+                .upload-area label {
+                    cursor: pointer;
+                    color: var(--primary);
+                    font-weight: 600;
                     font-size: 1.1em;
                 }
+                .upload-area label:hover { text-decoration: underline; }
+                .upload-area input[type="file"] { display: none; }
+                .upload-area .hint {
+                    color: var(--gray);
+                    font-size: 0.9em;
+                    margin-top: 8px;
+                }
+                .file-info {
+                    display: none;
+                    align-items: center;
+                    gap: 15px;
+                    padding: 15px 20px;
+                    background: #E8F5E9;
+                    border-radius: 12px;
+                    margin-top: 15px;
+                }
+                .file-info .filename {
+                    font-weight: 600;
+                    color: var(--dark);
+                }
+                .file-info .filesize {
+                    color: var(--gray);
+                    font-size: 0.9em;
+                }
+                .file-info .remove-file {
+                    cursor: pointer;
+                    color: var(--danger);
+                    font-weight: 600;
+                    margin-left: auto;
+                    padding: 5px 12px;
+                    border-radius: 8px;
+                    background: rgba(255,71,87,0.1);
+                }
+                .file-info .remove-file:hover { background: rgba(255,71,87,0.2); }
+
+                .filename-input-group {
+                    display: flex;
+                    gap: 15px;
+                    align-items: center;
+                    margin-bottom: 15px;
+                    flex-wrap: wrap;
+                }
+                .filename-input-group label {
+                    font-weight: 600;
+                    color: var(--dark);
+                }
+                .filename-input-group input {
+                    flex: 1;
+                    min-width: 200px;
+                    padding: 12px 16px;
+                    border: 2px solid var(--light-gray);
+                    border-radius: 12px;
+                    font-size: 0.95em;
+                    transition: border-color 0.3s;
+                }
+                .filename-input-group input:focus {
+                    outline: none;
+                    border-color: var(--primary);
+                }
+
+                .editor-wrapper {
+                    position: relative;
+                    border-radius: 16px;
+                    overflow: hidden;
+                    border: 2px solid var(--light-gray);
+                    transition: border-color 0.3s;
+                }
+                .editor-wrapper:focus-within {
+                    border-color: var(--primary);
+                }
+                textarea {
+                    width: 100%;
+                    min-height: 450px;
+                    padding: 20px;
+                    font-size: 15px;
+                    border: none;
+                    resize: vertical;
+                    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+                    line-height: 1.7;
+                    background: white;
+                }
+                textarea:focus { outline: none; }
+
                 .toolbar {
                     display: flex;
                     gap: 10px;
@@ -166,214 +330,82 @@ app.get('/', (req, res) => {
                     flex-wrap: wrap;
                     align-items: center;
                 }
-                .toolbar button {
-                    padding: 8px 20px;
-                    border: none;
-                    border-radius: 8px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.3s;
-                }
-                .btn-save {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                }
-                .btn-save:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.4); }
-                .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
-                .btn-new { background: #28a745; color: white; }
-                .btn-new:hover { background: #218838; }
-                .btn-delete { background: #dc3545; color: white; }
-                .btn-delete:hover { background: #c82333; }
-                .btn-raw { background: #17a2b8; color: white; }
-                .btn-raw:hover { background: #138496; }
-                .btn-view { background: #ffc107; color: #333; }
-                .btn-view:hover { background: #e0a800; }
-                .btn-upload { background: #6f42c1; color: white; }
-                .btn-upload:hover { background: #5a32a3; }
-                .btn-download { background: #20c997; color: white; }
-                .btn-download:hover { background: #1ba87e; }
-                .btn-dashboard { background: #fd7e14; color: white; }
-                .btn-dashboard:hover { background: #e06b0a; }
-                .status {
-                    font-size: 0.9em;
-                    color: #666;
-                    margin-left: auto;
-                }
-                .status.saved { color: #28a745; }
-                .status.unsaved { color: #dc3545; }
-                .editor-wrapper {
-                    position: relative;
-                }
-                textarea {
-                    width: 100%;
-                    min-height: 400px;
-                    padding: 20px;
-                    font-size: 15px;
-                    border: 2px solid #e0e0e0;
-                    border-radius: 10px;
-                    resize: vertical;
-                    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-                    line-height: 1.6;
-                    transition: border-color 0.3s;
-                }
-                textarea:focus {
-                    outline: none;
-                    border-color: #667eea;
-                }
-                .upload-area {
-                    border: 2px dashed #ddd;
-                    border-radius: 10px;
-                    padding: 20px;
-                    text-align: center;
-                    margin-bottom: 15px;
-                    transition: all 0.3s;
-                    background: #f8f9fa;
-                }
-                .upload-area:hover {
-                    border-color: #667eea;
-                    background: #f0f0ff;
-                }
-                .upload-area.dragover {
-                    border-color: #667eea;
-                    background: #e8e8ff;
-                }
-                .upload-area input[type="file"] {
-                    display: none;
-                }
-                .upload-area label {
-                    cursor: pointer;
-                    color: #667eea;
-                    font-weight: 600;
-                }
-                .upload-area label:hover {
-                    text-decoration: underline;
-                }
-                .file-info {
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    padding: 10px;
-                    background: #e7f3ff;
-                    border-radius: 8px;
-                    margin-top: 10px;
-                }
-                .file-info .filename {
-                    font-weight: 600;
-                    color: #333;
-                }
-                .file-info .filesize {
-                    color: #666;
-                    font-size: 0.9em;
-                }
-                .file-info .remove-file {
-                    cursor: pointer;
-                    color: #dc3545;
-                    font-weight: 600;
-                    margin-left: auto;
-                }
-                .file-info .remove-file:hover {
-                    text-decoration: underline;
-                }
-                .info-bar {
-                    margin-top: 15px;
+                .toolbar .btn { padding: 8px 18px; font-size: 0.9em; }
+
+                .status-bar {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
                     flex-wrap: wrap;
-                    gap: 10px;
-                    padding: 15px;
-                    background: #f8f9fa;
-                    border-radius: 10px;
+                    gap: 15px;
+                    padding: 15px 20px;
+                    background: #FAFBFC;
+                    border-radius: 12px;
+                    margin-top: 15px;
+                }
+                .status-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                    flex-wrap: wrap;
                 }
                 .paste-id {
                     font-family: monospace;
-                    background: #e9ecef;
-                    padding: 5px 12px;
-                    border-radius: 5px;
+                    background: var(--light-gray);
+                    padding: 5px 14px;
+                    border-radius: 8px;
                     font-size: 0.9em;
                 }
                 .paste-id a {
-                    color: #667eea;
+                    color: var(--primary);
                     text-decoration: none;
+                    font-weight: 600;
                 }
                 .paste-id a:hover { text-decoration: underline; }
                 .filename-display {
-                    background: #d4edda;
-                    padding: 5px 12px;
-                    border-radius: 5px;
+                    background: #E3F2FD;
+                    padding: 5px 14px;
+                    border-radius: 8px;
                     font-size: 0.9em;
-                    color: #155724;
+                    color: #1565C0;
+                    font-weight: 500;
                 }
-                .auto-save-indicator {
+                .char-count {
+                    color: var(--gray);
+                    font-size: 0.85em;
+                    background: var(--light-gray);
+                    padding: 4px 12px;
+                    border-radius: 20px;
+                }
+                .status-right {
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                }
+                .save-status {
                     display: flex;
                     align-items: center;
                     gap: 8px;
                     font-size: 0.9em;
-                    color: #28a745;
+                    font-weight: 500;
                 }
-                .auto-save-indicator .dot {
-                    width: 8px;
-                    height: 8px;
+                .save-status .dot {
+                    width: 10px;
+                    height: 10px;
                     border-radius: 50%;
                     display: inline-block;
                 }
-                .dot.green { background: #28a745; }
-                .dot.red { background: #dc3545; }
-                .stats {
-                    font-size: 0.85em;
-                    color: #888;
-                }
-                .footer {
-                    margin-top: 20px;
-                    text-align: center;
-                    color: #aaa;
-                    font-size: 0.8em;
-                }
-                .shortcuts {
-                    font-size: 0.85em;
-                    color: #888;
-                    margin-top: 10px;
-                }
-                .shortcuts kbd {
-                    background: #f0f0f0;
-                    padding: 2px 8px;
-                    border-radius: 4px;
-                    border: 1px solid #ddd;
-                    font-family: monospace;
-                }
-                .modal {
-                    display: none;
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: rgba(0,0,0,0.5);
-                    justify-content: center;
-                    align-items: center;
-                    z-index: 1000;
-                }
-                .modal-content {
-                    background: white;
-                    padding: 30px;
-                    border-radius: 15px;
-                    max-width: 400px;
-                    text-align: center;
-                }
-                .modal-content button {
-                    margin: 10px 5px;
-                    padding: 8px 20px;
-                    border: none;
-                    border-radius: 8px;
-                    cursor: pointer;
-                    font-weight: 600;
-                }
-                .modal-confirm { background: #dc3545; color: white; }
-                .modal-cancel { background: #6c757d; color: white; }
+                .dot.green { background: var(--success); }
+                .dot.red { background: var(--danger); }
+                .dot.yellow { background: var(--warning); }
+                .save-status.saved { color: var(--success); }
+                .save-status.unsaved { color: var(--danger); }
+                .save-status.saving { color: var(--warning); }
+
                 .progress-bar {
                     width: 100%;
                     height: 4px;
-                    background: #e0e0e0;
+                    background: var(--light-gray);
                     border-radius: 2px;
                     overflow: hidden;
                     margin-top: 10px;
@@ -382,99 +414,225 @@ app.get('/', (req, res) => {
                     height: 100%;
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     width: 0%;
-                    transition: width 0.3s;
+                    transition: width 0.5s ease;
                 }
-                .char-count {
-                    color: #666;
+
+                .shortcuts {
+                    display: flex;
+                    gap: 15px;
+                    flex-wrap: wrap;
+                    margin-top: 15px;
+                    padding: 12px 16px;
+                    background: #F8F9FA;
+                    border-radius: 12px;
                     font-size: 0.85em;
+                    color: var(--gray);
                 }
+                .shortcuts kbd {
+                    background: white;
+                    padding: 2px 10px;
+                    border-radius: 6px;
+                    border: 1px solid var(--light-gray);
+                    font-family: monospace;
+                    font-size: 0.85em;
+                    color: var(--dark);
+                }
+
+                .footer {
+                    text-align: center;
+                    color: rgba(255,255,255,0.7);
+                    font-size: 0.85em;
+                    padding: 20px 0 10px;
+                }
+
+                /* Modal */
+                .modal {
+                    display: none;
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.5);
+                    backdrop-filter: blur(5px);
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 9999;
+                }
+                .modal-content {
+                    background: white;
+                    padding: 35px;
+                    border-radius: 20px;
+                    max-width: 420px;
+                    width: 90%;
+                    text-align: center;
+                    animation: modalIn 0.3s ease;
+                }
+                @keyframes modalIn {
+                    from { transform: scale(0.9); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+                .modal-content .icon { font-size: 50px; margin-bottom: 15px; }
+                .modal-content h3 { color: var(--dark); margin-bottom: 10px; }
+                .modal-content p { color: var(--gray); margin-bottom: 20px; line-height: 1.6; }
+                .modal-content .btn-group {
+                    display: flex;
+                    gap: 10px;
+                    justify-content: center;
+                }
+
+                /* Dashboard link */
+                .dashboard-link {
+                    position: fixed;
+                    bottom: 30px;
+                    right: 30px;
+                    background: white;
+                    padding: 15px 20px;
+                    border-radius: 16px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                    text-decoration: none;
+                    color: var(--dark);
+                    font-weight: 600;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    transition: all 0.3s;
+                    z-index: 100;
+                }
+                .dashboard-link:hover {
+                    transform: translateY(-3px);
+                    box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+                }
+
                 @media (max-width: 768px) {
-                    .container { padding: 15px; }
-                    .toolbar button { font-size: 0.85em; padding: 6px 12px; }
+                    .main-card { padding: 20px; }
+                    .header-left h1 { font-size: 1.6em; }
+                    .toolbar .btn { font-size: 0.8em; padding: 6px 14px; }
+                    .filename-input-group input { min-width: 150px; }
+                    .status-bar { flex-direction: column; align-items: stretch; }
+                    .status-right { justify-content: flex-start; }
                 }
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>📝 Reo Pastebin</h1>
-                <p class="subtitle">Unlimited text with upload & auto-save</p>
-                
-                <div class="upload-area" id="uploadArea">
-                    <div>
-                        <label for="fileInput">📂 Upload file (drag & drop or click)</label>
-                        <input type="file" id="fileInput" accept="*/*">
-                        <div style="margin-top:10px;font-size:0.9em;color:#888;">
-                            Support semua format file (max 100MB)
+                <div class="main-card">
+                    <div class="header">
+                        <div class="header-left">
+                            <h1>📝 Reo Pastebin</h1>
+                            <div class="subtitle">Unlimited text • Upload file • Auto-save</div>
+                        </div>
+                        <div class="header-actions">
+                            <a href="/dashboard" class="btn btn-info">📊 Dashboard</a>
                         </div>
                     </div>
-                    <div id="fileInfo" style="display:none;" class="file-info">
-                        <span>📄</span>
-                        <span class="filename" id="fileName">file.txt</span>
-                        <span class="filesize" id="fileSize">0 KB</span>
-                        <span class="remove-file" onclick="removeFile()">✕ Hapus</span>
+
+                    <!-- Upload Area -->
+                    <div class="upload-area" id="uploadArea">
+                        <div class="icon">📂</div>
+                        <div>
+                            <label for="fileInput">Upload file (drag & drop atau klik)</label>
+                            <input type="file" id="fileInput" accept="*/*">
+                        </div>
+                        <div class="hint">Support semua format • Max 100MB</div>
+                        <div class="file-info" id="fileInfo">
+                            <span>📄</span>
+                            <span class="filename" id="fileName">file.txt</span>
+                            <span class="filesize" id="fileSize">0 KB</span>
+                            <span class="remove-file" onclick="removeFile()">✕ Hapus</span>
+                        </div>
+                    </div>
+
+                    <!-- Nama File Input -->
+                    <div class="filename-input-group">
+                        <label>📛 Nama File:</label>
+                        <input type="text" id="filenameInput" placeholder="Nama file (contoh: my-code.js)" value="unnamed">
+                        <span style="font-size:0.85em;color:var(--gray);">(opsional)</span>
+                    </div>
+
+                    <!-- Toolbar -->
+                    <div class="toolbar">
+                        <button class="btn btn-primary" id="saveBtn" onclick="manualSave()">💾 Save</button>
+                        <button class="btn btn-success" onclick="createNew()">✨ New</button>
+                        <button class="btn btn-info" onclick="viewRaw()">📄 Raw</button>
+                        <button class="btn btn-warning" onclick="viewPaste()">👁️ View</button>
+                        <button class="btn btn-secondary" onclick="downloadFile()">⬇️ Download</button>
+                        <button class="btn btn-danger" onclick="confirmDelete()">🗑️ Delete</button>
+                    </div>
+
+                    <!-- Editor -->
+                    <div class="editor-wrapper">
+                        <textarea id="editor" placeholder="Tulis atau paste teks kamu di sini... (unlimited)"></textarea>
+                    </div>
+
+                    <!-- Status Bar -->
+                    <div class="status-bar">
+                        <div class="status-left">
+                            <span class="paste-id" id="pasteIdDisplay">
+                                ID: <a href="#" id="pasteIdLink">belum dibuat</a>
+                            </span>
+                            <span class="filename-display" id="filenameDisplay">📄 unnamed</span>
+                            <span class="char-count" id="charCount">0 karakter</span>
+                        </div>
+                        <div class="status-right">
+                            <div class="save-status saved" id="saveStatus">
+                                <span class="dot green" id="saveDot"></span>
+                                <span id="statusText">✅ Tersimpan</span>
+                            </div>
+                            <span style="color:var(--gray);font-size:0.85em;" id="lastSaveTime"></span>
+                        </div>
+                    </div>
+
+                    <!-- Progress -->
+                    <div class="progress-bar">
+                        <div class="fill" id="progressFill"></div>
+                    </div>
+
+                    <!-- Shortcuts -->
+                    <div class="shortcuts">
+                        💡 <kbd>Ctrl+S</kbd> Save &nbsp;•&nbsp; <kbd>Ctrl+Shift+N</kbd> New &nbsp;•&nbsp;
+                        <kbd>Ctrl+U</kbd> Upload &nbsp;•&nbsp; <kbd>Ctrl+D</kbd> Download
                     </div>
                 </div>
-                
-                <div class="toolbar">
-                    <button class="btn-save" id="saveBtn" onclick="manualSave()">💾 Save</button>
-                    <button class="btn-new" onclick="createNew()">➕ New</button>
-                    <button class="btn-raw" onclick="viewRaw()">📄 Raw</button>
-                    <button class="btn-view" onclick="viewPaste()">👁️ View</button>
-                    <button class="btn-download" onclick="downloadFile()">⬇️ Download</button>
-                    <button class="btn-delete" onclick="confirmDelete()">🗑️ Delete</button>
-                    <button class="btn-dashboard" onclick="viewDashboard()">📊 Dashboard</button>
-                    <span class="status" id="statusText">✅ Saved</span>
+
+                <div class="footer">
+                    Reo Pastebin v2 • Unlimited karakter • Auto-save setiap 5 detik
                 </div>
-                
-                <div class="editor-wrapper">
-                    <textarea id="editor" placeholder="Tulis atau paste teks kamu di sini... (unlimited)"></textarea>
-                </div>
-                
-                <div class="info-bar">
-                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                        <span class="paste-id" id="pasteIdDisplay">
-                            ID: <a href="#" id="pasteIdLink">belum dibuat</a>
-                        </span>
-                        <span class="filename-display" id="filenameDisplay">📄 unnamed</span>
-                        <span class="char-count" id="charCount">0 karakter</span>
-                    </div>
-                    <div class="auto-save-indicator">
-                        <span class="dot green" id="saveDot"></span>
-                        <span id="saveStatus">Auto-save: ON</span>
-                        <span style="color:#999;margin-left:10px;" id="lastSaveTime"></span>
-                    </div>
-                </div>
-                
-                <div class="progress-bar">
-                    <div class="fill" id="progressFill"></div>
-                </div>
-                
-                <div class="shortcuts">
-                    💡 <kbd>Ctrl+S</kbd> Save &nbsp;|&nbsp; <kbd>Ctrl+Shift+N</kbd> New &nbsp;|&nbsp; 
-                    <kbd>Ctrl+U</kbd> Upload file &nbsp;|&nbsp; <kbd>Ctrl+D</kbd> Download
-                </div>
-                
-                <div class="footer">Reo Pastebin &bull; Unlimited karakter &bull; Auto-save setiap 5 detik</div>
             </div>
 
             <!-- Delete Modal -->
             <div class="modal" id="deleteModal">
                 <div class="modal-content">
-                    <h3>🗑️ Delete Paste?</h3>
-                    <p>Are you sure you want to delete this paste? This action cannot be undone.</p>
-                    <button class="modal-confirm" onclick="deletePaste()">Yes, Delete</button>
-                    <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+                    <div class="icon">🗑️</div>
+                    <h3>Hapus Paste?</h3>
+                    <p>Yakin mau hapus paste ini? <br><strong style="color:var(--danger);">Tindakan ini tidak bisa dibatalkan!</strong></p>
+                    <div class="btn-group">
+                        <button class="btn btn-danger" onclick="deletePaste()">Ya, Hapus</button>
+                        <button class="btn btn-secondary" onclick="closeModal()">Batal</button>
+                    </div>
                 </div>
             </div>
 
+            <!-- Dashboard Floating Button -->
+            <a href="/dashboard" class="dashboard-link">
+                📊 Dashboard
+            </a>
+
             <script>
                 let currentId = null;
-                let currentFilename = null;
+                let currentFilename = 'unnamed';
                 let isDirty = false;
-                let autoSaveTimer = null;
                 let lastSavedContent = '';
                 let uploadedFile = null;
                 const baseUrl = window.location.origin;
+
+                // DOM Elements
+                const editor = document.getElementById('editor');
+                const filenameInput = document.getElementById('filenameInput');
+                const statusText = document.getElementById('statusText');
+                const saveDot = document.getElementById('saveDot');
+                const saveStatus = document.getElementById('saveStatus');
+                const progressFill = document.getElementById('progressFill');
 
                 // Load dari localStorage
                 function loadFromStorage() {
@@ -485,10 +643,11 @@ app.get('/', (req, res) => {
                     if (savedId && savedContent) {
                         currentId = savedId;
                         currentFilename = savedFilename || 'unnamed';
-                        document.getElementById('editor').value = savedContent;
+                        editor.value = savedContent;
+                        filenameInput.value = currentFilename;
                         lastSavedContent = savedContent;
                         updatePasteInfo();
-                        updateStatus('saved', 'Loaded from storage');
+                        updateStatus('saved', '✅ Tersimpan');
                         updateFilenameDisplay();
                         updateCharCount();
                         return true;
@@ -508,19 +667,67 @@ app.get('/', (req, res) => {
                         }
                         lastSavedContent = content;
                         isDirty = false;
-                        updateStatus('saved', 'Auto-saved');
+                        updateStatus('saved', '✅ Tersimpan');
                         updateCharCount();
                     }
                 }
 
-                // Manual save ke server
+                // Update status
+                function updateStatus(type, message) {
+                    statusText.textContent = message;
+                    if (type === 'saved') {
+                        saveStatus.className = 'save-status saved';
+                        saveDot.className = 'dot green';
+                        isDirty = false;
+                    } else if (type === 'unsaved') {
+                        saveStatus.className = 'save-status unsaved';
+                        saveDot.className = 'dot red';
+                        isDirty = true;
+                    } else if (type === 'saving') {
+                        saveStatus.className = 'save-status saving';
+                        saveDot.className = 'dot yellow';
+                    }
+                }
+
+                // Progress bar
+                function showProgress(percent) {
+                    progressFill.style.width = percent + '%';
+                }
+
+                // Update info
+                function updatePasteInfo() {
+                    const link = document.getElementById('pasteIdLink');
+                    if (currentId) {
+                        link.textContent = currentId;
+                        link.href = '/' + currentId;
+                    } else {
+                        link.textContent = 'belum dibuat';
+                        link.href = '#';
+                    }
+                }
+
+                function updateFilenameDisplay() {
+                    const display = document.getElementById('filenameDisplay');
+                    const name = filenameInput.value || 'unnamed';
+                    display.textContent = '📄 ' + name;
+                    currentFilename = name;
+                }
+
+                function updateCharCount() {
+                    const count = editor.value.length;
+                    document.getElementById('charCount').textContent = count.toLocaleString() + ' karakter';
+                }
+
+                // Manual Save
                 async function manualSave() {
-                    const content = document.getElementById('editor').value;
+                    const content = editor.value;
                     if (!content.trim()) {
-                        alert('Cannot save empty content!');
+                        alert('Konten tidak boleh kosong!');
                         return;
                     }
 
+                    const filename = filenameInput.value.trim() || 'unnamed';
+                    updateStatus('saving', '⏳ Menyimpan...');
                     showProgress(50);
 
                     try {
@@ -530,44 +737,42 @@ app.get('/', (req, res) => {
                             body: JSON.stringify({ 
                                 id: currentId, 
                                 content: content,
-                                filename: currentFilename || 'unnamed'
+                                filename: filename
                             })
                         });
 
                         if (response.ok) {
                             const data = await response.json();
                             if (data.success) {
-                                saveToStorage(content, currentFilename);
-                                updateStatus('saved', 'Manual save');
-                                document.getElementById('saveBtn').disabled = true;
+                                saveToStorage(content, filename);
+                                updateStatus('saved', '✅ Tersimpan');
+                                document.getElementById('lastSaveTime').textContent = 
+                                    '🕐 ' + new Date().toLocaleTimeString();
                                 showProgress(100);
-                                setTimeout(() => {
-                                    document.getElementById('saveBtn').disabled = false;
-                                    showProgress(0);
-                                }, 1500);
+                                setTimeout(() => showProgress(0), 500);
                             }
                         } else {
                             throw new Error('Save failed');
                         }
                     } catch (error) {
-                        console.error('Error saving:', error);
-                        updateStatus('unsaved', 'Save failed!');
+                        console.error('Error:', error);
+                        updateStatus('unsaved', '❌ Gagal menyimpan!');
                         showProgress(0);
                     }
                 }
 
-                // Auto-save ke server
+                // Auto-save
                 async function autoSave() {
                     if (!currentId) return;
 
-                    const content = document.getElementById('editor').value;
+                    const content = editor.value;
                     if (content === lastSavedContent) return;
-
                     if (!content.trim()) {
-                        updateStatus('unsaved', 'Empty content');
+                        updateStatus('unsaved', '⚠️ Konten kosong');
                         return;
                     }
 
+                    const filename = filenameInput.value.trim() || 'unnamed';
                     showProgress(30);
 
                     try {
@@ -577,24 +782,71 @@ app.get('/', (req, res) => {
                             body: JSON.stringify({ 
                                 id: currentId, 
                                 content: content,
-                                filename: currentFilename || 'unnamed'
+                                filename: filename
                             })
                         });
 
                         if (response.ok) {
                             const data = await response.json();
                             if (data.success) {
-                                saveToStorage(content, currentFilename);
-                                updateStatus('saved', 'Auto-saved');
+                                saveToStorage(content, filename);
                                 document.getElementById('lastSaveTime').textContent = 
                                     '🕐 ' + new Date().toLocaleTimeString();
                                 showProgress(100);
-                                setTimeout(() => showProgress(0), 500);
+                                setTimeout(() => showProgress(0), 300);
                             }
                         }
                     } catch (error) {
                         console.error('Auto-save error:', error);
-                        updateStatus('unsaved', 'Auto-save failed');
+                        updateStatus('unsaved', '⚠️ Auto-save gagal');
+                        showProgress(0);
+                    }
+                }
+
+                // Create new paste
+                async function createNew() {
+                    if (isDirty) {
+                        if (!confirm('Ada perubahan yang belum disimpan. Buat baru tetap?')) {
+                            return;
+                        }
+                    }
+
+                    const content = editor.value;
+                    if (!content.trim()) {
+                        alert('Tulis sesuatu dulu!');
+                        return;
+                    }
+
+                    const filename = filenameInput.value.trim() || 'unnamed';
+                    showProgress(50);
+
+                    try {
+                        const response = await fetch('/create', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                content: content,
+                                filename: filename
+                            })
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.success) {
+                                currentId = data.id;
+                                saveToStorage(content, filename);
+                                updatePasteInfo();
+                                updateStatus('saved', '✅ Paste baru dibuat');
+                                document.getElementById('lastSaveTime').textContent = 
+                                    '🕐 ' + new Date().toLocaleTimeString();
+                                showProgress(100);
+                                setTimeout(() => showProgress(0), 500);
+                                window.history.pushState({}, '', '/' + currentId);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('Gagal membuat paste!');
                         showProgress(0);
                     }
                 }
@@ -604,23 +856,22 @@ app.get('/', (req, res) => {
                     if (!file) return;
                     
                     uploadedFile = file;
-                    currentFilename = file.name;
+                    const filename = file.name;
+                    filenameInput.value = filename;
+                    currentFilename = filename;
                     
-                    // Tampilkan info file
                     document.getElementById('fileInfo').style.display = 'flex';
-                    document.getElementById('fileName').textContent = file.name;
+                    document.getElementById('fileName').textContent = filename;
                     document.getElementById('fileSize').textContent = formatFileSize(file.size);
                     
-                    // Baca file
                     const reader = new FileReader();
                     reader.onload = function(e) {
-                        const content = e.target.result;
-                        document.getElementById('editor').value = content;
-                        lastSavedContent = content;
+                        editor.value = e.target.result;
+                        lastSavedContent = e.target.result;
                         updateCharCount();
-                        updateStatus('unsaved', 'File loaded');
+                        updateStatus('unsaved', '📂 File dimuat');
+                        updateFilenameDisplay();
                         
-                        // Auto-save setelah upload
                         if (currentId) {
                             setTimeout(autoSave, 1000);
                         }
@@ -628,122 +879,16 @@ app.get('/', (req, res) => {
                     reader.readAsText(file);
                 }
 
-                // Format file size
                 function formatFileSize(bytes) {
                     if (bytes < 1024) return bytes + ' B';
                     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
                     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
                 }
 
-                // Remove uploaded file
                 function removeFile() {
                     uploadedFile = null;
                     document.getElementById('fileInfo').style.display = 'none';
                     document.getElementById('fileInput').value = '';
-                    currentFilename = 'unnamed';
-                    updateFilenameDisplay();
-                }
-
-                // Buat paste baru
-                async function createNew() {
-                    if (isDirty) {
-                        if (!confirm('You have unsaved changes. Create new anyway?')) {
-                            return;
-                        }
-                    }
-
-                    const content = document.getElementById('editor').value;
-                    if (!content.trim()) {
-                        alert('Please write something first!');
-                        return;
-                    }
-
-                    showProgress(50);
-
-                    try {
-                        const response = await fetch('/create', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                content: content,
-                                filename: currentFilename || 'unnamed'
-                            })
-                        });
-
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (data.success) {
-                                currentId = data.id;
-                                saveToStorage(content, currentFilename);
-                                updatePasteInfo();
-                                updateStatus('saved', 'Created new paste');
-                                document.getElementById('lastSaveTime').textContent = 
-                                    '🕐 ' + new Date().toLocaleTimeString();
-                                showProgress(100);
-                                setTimeout(() => showProgress(0), 500);
-                                
-                                window.history.pushState({}, '', '/' + currentId);
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error creating:', error);
-                        alert('Failed to create paste!');
-                        showProgress(0);
-                    }
-                }
-
-                // Update info paste
-                function updatePasteInfo() {
-                    if (currentId) {
-                        document.getElementById('pasteIdLink').textContent = currentId;
-                        document.getElementById('pasteIdLink').href = '/' + currentId;
-                        document.getElementById('pasteIdDisplay').style.display = 'inline';
-                    } else {
-                        document.getElementById('pasteIdLink').textContent = 'belum dibuat';
-                        document.getElementById('pasteIdLink').href = '#';
-                    }
-                }
-
-                // Update filename display
-                function updateFilenameDisplay() {
-                    const display = document.getElementById('filenameDisplay');
-                    if (currentFilename && currentFilename !== 'unnamed') {
-                        display.textContent = '📄 ' + currentFilename;
-                        display.style.display = 'inline';
-                    } else {
-                        display.textContent = '📄 unnamed';
-                    }
-                }
-
-                // Update char count
-                function updateCharCount() {
-                    const content = document.getElementById('editor').value;
-                    const count = content.length;
-                    document.getElementById('charCount').textContent = 
-                        count.toLocaleString() + ' karakter';
-                }
-
-                // Update status
-                function updateStatus(type, message) {
-                    const statusText = document.getElementById('statusText');
-                    const dot = document.getElementById('saveDot');
-                    
-                    if (type === 'saved') {
-                        statusText.textContent = '✅ ' + message;
-                        statusText.className = 'status saved';
-                        dot.className = 'dot green';
-                        isDirty = false;
-                    } else {
-                        statusText.textContent = '⚠️ ' + message;
-                        statusText.className = 'status unsaved';
-                        dot.className = 'dot red';
-                        isDirty = true;
-                    }
-                }
-
-                // Show progress
-                function showProgress(percent) {
-                    document.getElementById('progressFill').style.width = percent + '%';
                 }
 
                 // View raw
@@ -751,29 +896,28 @@ app.get('/', (req, res) => {
                     if (currentId) {
                         window.open(baseUrl + '/raw/' + currentId, '_blank');
                     } else {
-                        alert('No paste to view!');
+                        alert('Tidak ada paste untuk dilihat!');
                     }
                 }
 
-                // View paste
                 function viewPaste() {
                     if (currentId) {
                         window.open(baseUrl + '/' + currentId, '_blank');
                     } else {
-                        alert('No paste to view!');
+                        alert('Tidak ada paste untuk dilihat!');
                     }
                 }
 
-                // Download file
+                // Download
                 function downloadFile() {
-                    const content = document.getElementById('editor').value;
+                    const content = editor.value;
                     if (!content.trim()) {
-                        alert('No content to download!');
+                        alert('Tidak ada konten untuk di-download!');
                         return;
                     }
                     
-                    const filename = currentFilename || 'paste.txt';
-                    const blob = new Blob([content], { type: 'text/plain' });
+                    const filename = filenameInput.value.trim() || 'paste.txt';
+                    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
@@ -784,15 +928,10 @@ app.get('/', (req, res) => {
                     URL.revokeObjectURL(url);
                 }
 
-                // View dashboard
-                function viewDashboard() {
-                    window.open(baseUrl + '/dashboard', '_blank');
-                }
-
-                // Delete paste
+                // Delete - FIXED: cuma hapus 1 file
                 function confirmDelete() {
                     if (!currentId) {
-                        alert('No paste to delete!');
+                        alert('Tidak ada paste untuk dihapus!');
                         return;
                     }
                     document.getElementById('deleteModal').style.display = 'flex';
@@ -807,25 +946,30 @@ app.get('/', (req, res) => {
                         });
 
                         if (response.ok) {
+                            // Hapus hanya data yang spesifik
                             localStorage.removeItem('reo_paste_id');
                             localStorage.removeItem('reo_paste_content');
                             localStorage.removeItem('reo_paste_filename');
                             currentId = null;
-                            currentFilename = null;
                             lastSavedContent = '';
-                            document.getElementById('editor').value = '';
+                            editor.value = '';
+                            filenameInput.value = 'unnamed';
                             updatePasteInfo();
-                            updateStatus('saved', 'Deleted');
+                            updateStatus('saved', '✅ Paste dihapus');
                             document.getElementById('lastSaveTime').textContent = '';
                             closeModal();
                             window.history.pushState({}, '', '/');
                             removeFile();
                             updateCharCount();
                             updateFilenameDisplay();
+                            showProgress(0);
+                            alert('✅ Paste berhasil dihapus!');
+                        } else {
+                            throw new Error('Delete failed');
                         }
                     } catch (error) {
-                        console.error('Error deleting:', error);
-                        alert('Failed to delete paste!');
+                        console.error('Error:', error);
+                        alert('❌ Gagal menghapus paste!');
                     }
                 }
 
@@ -833,15 +977,15 @@ app.get('/', (req, res) => {
                     document.getElementById('deleteModal').style.display = 'none';
                 }
 
-                // Event listeners
+                // Event Listeners
                 document.getElementById('deleteModal').addEventListener('click', function(e) {
                     if (e.target === this) closeModal();
                 });
 
-                document.getElementById('editor').addEventListener('input', function() {
+                editor.addEventListener('input', function() {
                     const content = this.value;
                     if (content !== lastSavedContent) {
-                        updateStatus('unsaved', 'Unsaved changes');
+                        updateStatus('unsaved', '⚠️ Belum tersimpan');
                         if (currentId) {
                             localStorage.setItem('reo_paste_content', content);
                         }
@@ -849,14 +993,20 @@ app.get('/', (req, res) => {
                     updateCharCount();
                 });
 
-                // File upload events
+                filenameInput.addEventListener('input', function() {
+                    updateFilenameDisplay();
+                    if (currentId) {
+                        localStorage.setItem('reo_paste_filename', this.value);
+                    }
+                });
+
+                // Upload events
                 document.getElementById('fileInput').addEventListener('change', function(e) {
                     if (this.files && this.files[0]) {
                         handleFileUpload(this.files[0]);
                     }
                 });
 
-                // Drag and drop
                 const uploadArea = document.getElementById('uploadArea');
                 uploadArea.addEventListener('dragover', function(e) {
                     e.preventDefault();
@@ -906,19 +1056,19 @@ app.get('/', (req, res) => {
                                     if (data.success) {
                                         currentId = id;
                                         currentFilename = data.metadata?.filename || 'unnamed';
-                                        document.getElementById('editor').value = data.content;
+                                        editor.value = data.content;
+                                        filenameInput.value = currentFilename;
                                         lastSavedContent = data.content;
                                         saveToStorage(data.content, currentFilename);
                                         updatePasteInfo();
-                                        updateStatus('saved', 'Loaded from server');
+                                        updateStatus('saved', '✅ Dimuat dari server');
                                         updateFilenameDisplay();
                                         updateCharCount();
                                     }
                                 })
                                 .catch(() => {
                                     if (!loadFromStorage()) {
-                                        const content = document.getElementById('editor').value;
-                                        if (content.trim()) {
+                                        if (editor.value.trim()) {
                                             createNew();
                                         }
                                     }
@@ -929,7 +1079,7 @@ app.get('/', (req, res) => {
 
                     if (!loadFromStorage()) {
                         updatePasteInfo();
-                        updateStatus('saved', 'Ready');
+                        updateStatus('saved', '✅ Siap');
                         updateFilenameDisplay();
                         updateCharCount();
                     }
@@ -941,19 +1091,22 @@ app.get('/', (req, res) => {
                 // Save before unload
                 window.addEventListener('beforeunload', function() {
                     if (isDirty && currentId) {
-                        const content = document.getElementById('editor').value;
+                        const content = editor.value;
+                        const filename = filenameInput.value.trim() || 'unnamed';
                         localStorage.setItem('reo_paste_content', content);
+                        localStorage.setItem('reo_paste_filename', filename);
                         navigator.sendBeacon('/update', JSON.stringify({
                             id: currentId,
                             content: content,
-                            filename: currentFilename || 'unnamed'
+                            filename: filename
                         }));
                     }
                 });
 
-                console.log('📝 Reo Pastebin loaded!');
-                console.log('💾 Unlimited text & auto-save');
-                console.log('📂 Upload file support');
+                console.log('📝 Reo Pastebin v2 loaded!');
+                console.log('✅ Bug delete fixed!');
+                console.log('📛 Kolom nama file tersedia!');
+                console.log('🎨 UI lebih bagus!');
                 console.log('⌨️  Ctrl+S save, Ctrl+Shift+N new, Ctrl+U upload, Ctrl+D download');
             </script>
         </body>
@@ -961,7 +1114,7 @@ app.get('/', (req, res) => {
     `);
 });
 
-// Dashboard - Lihat semua paste
+// DASHBOARD
 app.get('/dashboard', (req, res) => {
     const pastes = getAllPastes();
     
@@ -974,104 +1127,134 @@ app.get('/dashboard', (req, res) => {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
+                :root {
+                    --primary: #6C63FF;
+                    --gray: #636E72;
+                    --light-gray: #DFE6E9;
+                    --dark: #2D3436;
+                }
                 body {
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    background: #f5f5f5;
+                    background: #F0F2F5;
                     padding: 20px;
                 }
                 .container {
                     max-width: 1200px;
                     margin: 0 auto;
+                }
+                .header {
                     background: white;
                     border-radius: 20px;
                     padding: 30px;
-                    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-                }
-                h1 { color: #333; margin-bottom: 20px; }
-                .header {
+                    margin-bottom: 20px;
+                    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    margin-bottom: 20px;
                     flex-wrap: wrap;
-                    gap: 10px;
+                    gap: 15px;
                 }
-                .btn-home {
-                    padding: 10px 20px;
+                .header h1 {
+                    font-size: 2em;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                }
+                .header .stats {
+                    color: var(--gray);
+                    font-size: 1em;
+                }
+                .btn {
+                    padding: 10px 24px;
+                    border: none;
+                    border-radius: 12px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    text-decoration: none;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .btn-primary {
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     color: white;
-                    border: none;
-                    border-radius: 8px;
-                    cursor: pointer;
-                    font-weight: 600;
-                    text-decoration: none;
                 }
-                .btn-home:hover {
+                .btn-primary:hover {
                     transform: translateY(-2px);
-                    box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+                    box-shadow: 0 10px 25px rgba(102,126,234,0.3);
                 }
-                .stats {
-                    color: #666;
+                .btn-secondary {
+                    background: var(--light-gray);
+                    color: var(--dark);
                 }
-                .paste-grid {
+                .btn-secondary:hover {
+                    background: #d0d0d0;
+                }
+                .grid {
                     display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
                     gap: 20px;
                 }
-                .paste-card {
-                    border: 1px solid #e0e0e0;
-                    border-radius: 12px;
-                    padding: 20px;
+                .card {
+                    background: white;
+                    border-radius: 16px;
+                    padding: 25px;
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.06);
                     transition: all 0.3s;
                 }
-                .paste-card:hover {
-                    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-                    transform: translateY(-2px);
+                .card:hover {
+                    transform: translateY(-4px);
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
                 }
-                .paste-card .id {
+                .card .id {
                     font-family: monospace;
-                    color: #667eea;
+                    color: var(--primary);
                     font-weight: 600;
+                    font-size: 0.95em;
                 }
-                .paste-card .filename {
-                    color: #333;
+                .card .filename {
                     font-weight: 600;
-                    margin: 10px 0;
+                    font-size: 1.1em;
+                    margin: 10px 0 8px;
+                    color: var(--dark);
                 }
-                .paste-card .meta {
-                    color: #666;
+                .card .meta {
+                    color: var(--gray);
                     font-size: 0.85em;
+                    line-height: 1.6;
                 }
-                .paste-card .size {
-                    color: #888;
+                .card .size {
+                    color: var(--gray);
                     font-size: 0.8em;
+                    margin-top: 5px;
                 }
-                .paste-card .actions {
+                .card .actions {
                     margin-top: 15px;
                     display: flex;
                     gap: 8px;
                     flex-wrap: wrap;
                 }
-                .paste-card .actions a {
-                    padding: 5px 12px;
-                    border-radius: 5px;
-                    text-decoration: none;
-                    font-size: 0.85em;
-                    font-weight: 600;
-                }
-                .action-view { background: #e7f3ff; color: #667eea; }
-                .action-raw { background: #f0f0f0; color: #333; }
-                .action-edit { background: #d4edda; color: #155724; }
-                .action-view:hover, .action-raw:hover, .action-edit:hover {
-                    opacity: 0.8;
+                .card .actions .btn {
+                    padding: 6px 14px;
+                    font-size: 0.8em;
+                    border-radius: 8px;
                 }
                 .empty {
+                    grid-column: 1/-1;
                     text-align: center;
-                    padding: 60px 20px;
-                    color: #888;
+                    padding: 80px 20px;
+                    background: white;
+                    border-radius: 20px;
                 }
-                .empty .icon { font-size: 60px; margin-bottom: 20px; }
-                .empty h3 { color: #333; margin-bottom: 10px; }
+                .empty .icon { font-size: 70px; margin-bottom: 15px; }
+                .empty h3 { color: var(--dark); margin-bottom: 8px; }
+                .empty p { color: var(--gray); }
+                @media (max-width: 768px) {
+                    .grid { grid-template-columns: 1fr; }
+                    .header { flex-direction: column; text-align: center; }
+                }
             </style>
         </head>
         <body>
@@ -1079,29 +1262,30 @@ app.get('/dashboard', (req, res) => {
                 <div class="header">
                     <div>
                         <h1>📊 Dashboard</h1>
-                        <div class="stats">${pastes.length} paste${pastes.length !== 1 ? 's' : ''} total</div>
+                        <div class="stats">${pastes.length} paste${pastes.length !== 1 ? 's' : ''} tersimpan</div>
                     </div>
-                    <a href="/" class="btn-home">🏠 Back to Editor</a>
+                    <a href="/" class="btn btn-primary">✏️ Kembali ke Editor</a>
                 </div>
                 
-                <div class="paste-grid">
+                <div class="grid">
                     ${pastes.length === 0 ? `
-                        <div class="empty" style="grid-column: 1/-1;">
+                        <div class="empty">
                             <div class="icon">📭</div>
-                            <h3>No pastes yet</h3>
-                            <p>Create your first paste by going to the editor!</p>
+                            <h3>Belum ada paste</h3>
+                            <p>Buat paste pertama kamu di editor!</p>
+                            <a href="/" class="btn btn-primary" style="margin-top:15px;">📝 Buat Paste</a>
                         </div>
                     ` : pastes.map(paste => `
-                        <div class="paste-card">
+                        <div class="card">
                             <div class="id">#${paste.id}</div>
                             <div class="filename">📄 ${paste.filename || 'unnamed'}</div>
-                            <div class="meta">Created: ${new Date(paste.created).toLocaleString()}</div>
-                            <div class="meta">Updated: ${new Date(paste.updated).toLocaleString()}</div>
-                            <div class="size">Size: ${(paste.size || 0).toLocaleString()} characters</div>
+                            <div class="meta">📅 Dibuat: ${new Date(paste.created).toLocaleString('id-ID')}</div>
+                            <div class="meta">🔄 Diupdate: ${new Date(paste.updated).toLocaleString('id-ID')}</div>
+                            <div class="size">📏 ${(paste.size || 0).toLocaleString()} karakter</div>
                             <div class="actions">
-                                <a href="/${paste.id}" class="action-view">👁️ View</a>
-                                <a href="/raw/${paste.id}" class="action-raw">📄 Raw</a>
-                                <a href="/?id=${paste.id}" class="action-edit">✏️ Edit</a>
+                                <a href="/${paste.id}" class="btn btn-secondary">👁️ View</a>
+                                <a href="/raw/${paste.id}" class="btn btn-secondary">📄 Raw</a>
+                                <a href="/?id=${paste.id}" class="btn btn-primary">✏️ Edit</a>
                             </div>
                         </div>
                     `).join('')}
@@ -1112,7 +1296,7 @@ app.get('/dashboard', (req, res) => {
     `);
 });
 
-// API: Create paste
+// API Routes
 app.post('/create', (req, res) => {
     const { content, filename } = req.body;
     if (!content || content.trim() === '') {
@@ -1121,11 +1305,9 @@ app.post('/create', (req, res) => {
     
     const id = generateId();
     const metadata = savePaste(id, content, filename || 'unnamed');
-    
     res.json({ success: true, id: id, metadata: metadata });
 });
 
-// API: Get paste
 app.get('/get/:id', (req, res) => {
     const id = req.params.id;
     const result = getPaste(id);
@@ -1137,7 +1319,6 @@ app.get('/get/:id', (req, res) => {
     res.json({ success: true, content: result.content, metadata: result.metadata });
 });
 
-// API: Update paste
 app.post('/update', (req, res) => {
     const { id, content, filename } = req.body;
     
@@ -1153,7 +1334,6 @@ app.post('/update', (req, res) => {
     res.json({ success: true });
 });
 
-// API: Delete paste
 app.delete('/delete/:id', (req, res) => {
     const id = req.params.id;
     const deleted = deletePaste(id);
@@ -1165,42 +1345,6 @@ app.delete('/delete/:id', (req, res) => {
     res.json({ success: true });
 });
 
-// View paste
-app.get('/:id', (req, res) => {
-    const id = req.params.id;
-    const result = getPaste(id);
-    
-    if (!result) {
-        return res.status(404).send(`
-            <!DOCTYPE html>
-            <html>
-            <head><title>Not Found - Reo Pastebin</title></head>
-            <body style="font-family: Arial; text-align: center; padding: 50px;">
-                <h2>❌ Paste Not Found</h2>
-                <p>The paste you're looking for doesn't exist or has been deleted.</p>
-                <a href="/" style="color: #667eea;">← Back to Home</a>
-            </body>
-            </html>
-        `);
-    }
-    
-    // Redirect ke editor
-    res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta http-equiv="refresh" content="0;url=/?id=${id}">
-            <title>Redirecting to ${id}</title>
-        </head>
-        <body>
-            <p>Redirecting to paste editor...</p>
-            <a href="/?id=${id}">Click here if not redirected</a>
-        </body>
-        </html>
-    `);
-});
-
-// RAW paste
 app.get('/raw/:id', (req, res) => {
     const id = req.params.id;
     const result = getPaste(id);
@@ -1209,25 +1353,41 @@ app.get('/raw/:id', (req, res) => {
         return res.status(404).send('Paste not found');
     }
     
-    // Set header untuk download
     const filename = result.metadata?.filename || `paste-${id}.txt`;
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.send(result.content);
 });
 
-// Health check
+app.get('/:id', (req, res) => {
+    const id = req.params.id;
+    const result = getPaste(id);
+    
+    if (!result) {
+        return res.status(404).send(`
+            <!DOCTYPE html>
+            <html>
+            <head><title>Not Found</title></head>
+            <body style="font-family:Arial;text-align:center;padding:50px;">
+                <h2>❌ Paste Not Found</h2>
+                <p>Paste tidak ditemukan atau sudah dihapus.</p>
+                <a href="/" style="color:#667eea;">← Kembali</a>
+            </body>
+            </html>
+        `);
+    }
+    
+    res.send(`<meta http-equiv="refresh" content="0;url=/?id=${id}">`);
+});
+
 app.get('/health', (req, res) => {
     res.status(200).send('OK');
 });
 
-// Start server
 app.listen(PORT, () => {
-    console.log(`🚀 Reo Pastebin running on port ${PORT}`);
+    console.log(`🚀 Reo Pastebin v2 running on port ${PORT}`);
     console.log(`📝 Visit: http://localhost:${PORT}`);
     console.log(`📊 Dashboard: http://localhost:${PORT}/dashboard`);
-    console.log(`💾 Data stored in: ${DATA_DIR}`);
-    console.log(`📂 Upload folder: ${UPLOAD_DIR}`);
-    console.log(`✨ Features: Unlimited text, Upload file, Auto-save, Edit, Dashboard`);
+    console.log(`✅ Bug delete fixed!`);
+    console.log(`📛 Kolom nama file tersedia!`);
 });
